@@ -1,6 +1,6 @@
 async function checkout(){
   if(!cart.length){
-    toast('กรุณาเลือกสินค้าก่อน');
+    toast('กรุณาเลือกสินค้า');
     return;
   }
 
@@ -12,21 +12,18 @@ async function checkout(){
   if(payMethod === 'cash'){
     received = Number($('received').value || 0);
 
-    if(received <= 0){
-      toast('กรุณาใส่จำนวนเงินที่รับมา');
-      $('received').focus();
-      return;
-    }
-
     if(received < total){
-      toast('เงินที่รับมาไม่พอ ต้องรับอย่างน้อย ' + baht(total));
+      toast('เงินที่รับไม่พอ');
       return;
     }
 
     changeAmount = received - total;
   }
 
-  const payload = {
+  const orderId = crypto.randomUUID();
+
+  const orderPayload = {
+    id: orderId,
     cashier_id: profile.id,
     payment_method: payMethod,
     total: total,
@@ -35,52 +32,42 @@ async function checkout(){
     status: 'paid'
   };
 
-  console.log('กำลังสร้างออเดอร์:', payload);
+  console.log('ORDER:', orderPayload);
 
-  const { data: order, error: orderError } =
-    await sb
-      .from('orders')
-      .insert(payload)
-      .select('id, order_no, total, payment_method')
-      .single();
+  const { error: orderError } =
+    await sb.from('orders').insert(orderPayload);
 
   if(orderError){
-    console.error('ORDER ERROR:', orderError);
+    console.error(orderError);
     toast('สร้างออเดอร์ไม่ได้: ' + orderError.message);
     return;
   }
 
-  if(!order || !order.id){
-    toast('สร้างออเดอร์ไม่สำเร็จ: ไม่พบเลขออเดอร์');
-    return;
-  }
-
   const items = cart.map(item => ({
-    order_id: order.id,
+    order_id: orderId,
     product_id: item.id,
     product_name: item.name,
     unit_price: Number(item.price),
     quantity: Number(item.qty)
   }));
 
-  console.log('กำลังบันทึกรายการ:', items);
+  console.log('ITEMS:', items);
 
   const { error: itemError } =
-    await sb
-      .from('order_items')
-      .insert(items);
+    await sb.from('order_items').insert(items);
 
   if(itemError){
-    console.error('ORDER ITEMS ERROR:', itemError);
-    toast('เพิ่มรายการในออเดอร์ไม่ได้: ' + itemError.message);
+    console.error(itemError);
+    toast('เพิ่มสินค้าในออเดอร์ไม่ได้: ' + itemError.message);
     return;
   }
 
   toast(
-    '✅ บันทึกออเดอร์ #' +
-    (order.order_no || order.id) +
-    ' สำเร็จ ' +
-    baht(total)
+    '✅ ชำระเงินสำเร็จ ' +
+    baht(total) +
+    (payMethod === 'cash'
+      ? ' • เงินทอน ' + baht(changeAmount)
+      : '')
   );
 
   cart = [];
