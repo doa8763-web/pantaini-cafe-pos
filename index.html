@@ -1,80 +1,77 @@
-async function checkout(){
-  if(!cart.length){
-    toast('กรุณาเลือกสินค้า');
+function renderPOS(){
+
+  const cats = [...new Set(
+    products
+      .map(p => String(p.category || '').trim())
+      .filter(Boolean)
+  )];
+
+  if(!cats.length){
+    $('cats').innerHTML = '';
+    $('products').innerHTML =
+      '<div class="empty">ยังไม่มีเมนูในระบบ</div>';
     return;
   }
 
-  const total = cartTotal();
-
-  let received = null;
-  let changeAmount = 0;
-
-  if(payMethod === 'cash'){
-    received = Number($('received').value || 0);
-
-    if(received < total){
-      toast('เงินที่รับไม่พอ');
-      return;
-    }
-
-    changeAmount = received - total;
+  if(!activeCat || !cats.includes(activeCat)){
+    activeCat = cats[0];
   }
 
-  const orderId = crypto.randomUUID();
+  $('cats').innerHTML = '';
 
-  const orderPayload = {
-    id: orderId,
-    cashier_id: profile.id,
-    payment_method: payMethod,
-    total: total,
-    received: received,
-    change_amount: changeAmount,
-    status: 'paid'
-  };
+  cats.forEach(cat => {
 
-  console.log('ORDER:', orderPayload);
+    const b = document.createElement('button');
 
-  const { error: orderError } =
-    await sb.from('orders').insert(orderPayload);
+    b.type = 'button';
+    b.className = cat === activeCat ? 'active' : '';
+    b.textContent = (icon[cat] || '🍽️') + ' ' + cat;
 
-  if(orderError){
-    console.error(orderError);
-    toast('สร้างออเดอร์ไม่ได้: ' + orderError.message);
-    return;
-  }
+    b.onclick = function(e){
+      e.preventDefault();
+      activeCat = cat;
+      renderPOS();
+    };
 
-  const items = cart.map(item => ({
-    order_id: orderId,
-    product_id: item.id,
-    product_name: item.name,
-    unit_price: Number(item.price),
-    quantity: Number(item.qty)
-  }));
+    $('cats').appendChild(b);
+  });
 
-  console.log('ITEMS:', items);
-
-  const { error: itemError } =
-    await sb.from('order_items').insert(items);
-
-  if(itemError){
-    console.error(itemError);
-    toast('เพิ่มสินค้าในออเดอร์ไม่ได้: ' + itemError.message);
-    return;
-  }
-
-  toast(
-    '✅ ชำระเงินสำเร็จ ' +
-    baht(total) +
-    (payMethod === 'cash'
-      ? ' • เงินทอน ' + baht(changeAmount)
-      : '')
+  const visible = products.filter(
+    p => String(p.category) === String(activeCat)
   );
 
-  cart = [];
-  $('received').value = '';
+  const el = $('products');
 
-  renderCart();
-  await loadOrders();
-  renderOrders();
-  renderDashboard();
+  el.innerHTML = '';
+
+  visible.forEach(product => {
+
+    const card = document.createElement('div');
+
+    card.className = 'product';
+
+    card.style.cursor = 'pointer';
+
+    card.innerHTML =
+      '<div style="font-size:28px">' +
+      (icon[product.category] || '🍽️') +
+      '</div>' +
+      '<h3>' +
+      esc(product.name) +
+      '</h3>' +
+      '<div class="price">' +
+      baht(product.price) +
+      '</div>';
+
+    card.onclick = function(){
+
+      console.log('กดสินค้า:', product);
+
+      addCart(product);
+
+    };
+
+    el.appendChild(card);
+
+  });
 }
