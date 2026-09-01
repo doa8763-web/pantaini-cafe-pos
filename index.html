@@ -1,27 +1,51 @@
 function renderPOS(){
-  const cats = [...new Set(products.map(p => p.category))];
+  const cats = [...new Set(products.map(p => p.category).filter(Boolean))];
 
   if(!cats.includes(activeCat)){
     activeCat = cats[0] || '';
   }
 
-  document.getElementById('cats').innerHTML = cats.map(c => `
-    <button 
+  const catsEl = document.getElementById('cats');
+
+  catsEl.innerHTML = cats.map(c => `
+    <button
+      type="button"
       class="${c === activeCat ? 'active' : ''}"
-      onclick="activeCat='${c}';renderPOS()">
-      ${icon[c] || '🍽️'} ${c}
+      data-category="${esc(c)}"
+    >
+      ${icon[c] || '🍽️'} ${esc(c)}
     </button>
   `).join('');
 
-  const ps = products.filter(p => p.category === activeCat);
+  // ปุ่มหมวดหมู่
+  catsEl.querySelectorAll('button[data-category]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeCat = btn.dataset.category;
+      renderPOS();
+    });
+  });
 
-  document.getElementById('products').innerHTML = ps.length
-    ? ps.map(p => `
-      <div class="product" onclick="addCart(${p.id})">
-        <div style="font-size:28px">${icon[p.category] || '🍽️'}</div>
-        <h3>${esc(p.name)}</h3>
-        <div class="price">${baht(p.price)}</div>
-      </div>
-    `).join('')
-    : '<div class="empty">ไม่มีเมนู</div>';
+  const ps = products.filter(p => p.category === activeCat);
+  const productsEl = document.getElementById('products');
+
+  if(!ps.length){
+    productsEl.innerHTML = '<div class="empty">ไม่มีเมนู</div>';
+    return;
+  }
+
+  productsEl.innerHTML = ps.map(p => `
+    <div class="product" data-product-id="${p.id}">
+      <div style="font-size:28px">${icon[p.category] || '🍽️'}</div>
+      <h3>${esc(p.name)}</h3>
+      <div class="price">${baht(p.price)}</div>
+    </div>
+  `).join('');
+
+  // คลิกสินค้า
+  productsEl.querySelectorAll('.product').forEach(card => {
+    card.addEventListener('click', () => {
+      const productId = card.dataset.productId;
+      addCart(productId);
+    });
+  });
 }
